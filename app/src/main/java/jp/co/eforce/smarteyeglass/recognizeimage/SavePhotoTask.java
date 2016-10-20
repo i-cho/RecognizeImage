@@ -39,14 +39,24 @@ import java.io.FileOutputStream;
 
 /**
  * Save photo data.
+ * @param Params
+ * @param Progress
+ * @param Result
  */
 class SavePhotoTask extends AsyncTask<byte[], String, String> {
     private final String fileName;
     private final File saveFolder;
-    public SavePhotoTask(File folder,String name) {
+
+    public SavePhotoTask(File folder, String name) {
         this.saveFolder = folder;
         this.fileName = name;
     }
+
+    /**
+     *
+     * @param jpeg
+     * @return
+     */
     @Override
     protected String doInBackground(byte[]... jpeg) {
         File photo = new File(saveFolder,fileName);

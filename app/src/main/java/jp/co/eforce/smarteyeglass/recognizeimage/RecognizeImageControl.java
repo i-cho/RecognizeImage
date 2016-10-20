@@ -7,6 +7,7 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.net.Uri;
+import android.os.Environment;
 import android.text.format.Time;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -58,6 +59,15 @@ public final class RecognizeImageControl extends ControlExtension {
     private VisionServiceClient client;
 
     /**
+     * for debugging
+     */
+    private boolean saveToSdcard = true;
+    private int saveFileIndex;
+    private String saveFilePrefix;
+    private File saveFolder;
+
+
+    /**
      * Creates an instance of this control class.
      *
      * @param context
@@ -105,14 +115,22 @@ public final class RecognizeImageControl extends ControlExtension {
         utils.setRequiredApiVersion(SMARTEYEGLASS_API_VERSION);
         utils.activate(context);
 
+        // Set the camera mode to match the setup
+        utils.setCameraMode(jpegQuality, resolution, recordingMode);
+
         width = context.getResources().getDimensionPixelSize(R.dimen.preview_image_width);
         height = context.getResources().getDimensionPixelSize(R.dimen.preview_image_height);
 
         drawX = context.getResources().getInteger(R.integer.preview_image_left);
         drawY = context.getResources().getInteger(R.integer.preview_image_top);
 
+        saveFolder = new File(Environment.getExternalStorageDirectory(), "eforce");
+        if (!saveFolder.exists()) {
+            saveFolder.mkdirs();
+        }
+
         // Switch WLAN mode ON to achieve higher speed on live stream
-        utils.setPowerMode(SmartEyeglassControl.Intents.POWER_MODE_HIGH);
+        //utils.setPowerMode(SmartEyeglassControl.Intents.POWER_MODE_HIGH);
     }
 
     // When app becomes visible, set up camera mode choices
@@ -124,6 +142,11 @@ public final class RecognizeImageControl extends ControlExtension {
         // battery. It is done here solely for demonstration purposes.
         setScreenState(Control.Intents.SCREEN_STATE_ON);
 
+        Time now = new Time();
+        now.setToNow();
+        saveFilePrefix = "smarteyeglass_" + now.format2445() + "_";
+        saveFileIndex = 0;
+
         // Set the camera mode to match the setup
         utils.setCameraMode(jpegQuality, resolution, recordingMode);
 
@@ -131,6 +154,8 @@ public final class RecognizeImageControl extends ControlExtension {
 
         updateLayout();
         setResultText(R.string.usage);
+
+        super.onResume();
     }
 
     // Clean up any open files and reset mode when app is paused.
@@ -147,6 +172,7 @@ public final class RecognizeImageControl extends ControlExtension {
     @Override
     public void onDestroy() {
         Log.d(Constants.LOG_TAG, "Control onDestroy");
+        utils.stopCamera();
         utils.deactivate();
     }
 
@@ -155,6 +181,8 @@ public final class RecognizeImageControl extends ControlExtension {
      */
     @Override
     public void onTouch(final ControlTouchEvent event) {
+        super.onTouch(event);
+
         if (event.getAction() == Control.TapActions.SINGLE_TAP) {
             if (!cameraStarted) {
                 initializeCamera();
@@ -169,8 +197,6 @@ public final class RecognizeImageControl extends ControlExtension {
      */
     private void initializeCamera() {
         try {
-            Time now = new Time();
-            now.setToNow();
             // Start camera without filepath for other recording modes
             Log.d(Constants.LOG_TAG, "startCamera ");
             utils.startCamera();
@@ -221,15 +247,26 @@ public final class RecognizeImageControl extends ControlExtension {
             return;
         }
 
+        if (saveToSdcard == true) {
+            String fileName = saveFilePrefix + String.format("%04d", saveFileIndex) + ".jpg";
+            new SavePhotoTask(saveFolder, fileName).execute(data);
+            saveFileIndex++;
+        }
+
         if (recordingMode == SmartEyeglassControl.Intents.CAMERA_MODE_STILL) {
             Bitmap baseBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
             //bitmap[3] = Bitmap.createScaledBitmap(bitmap[0], 80, 48, true);
             baseBitmap.setDensity(DisplayMetrics.DENSITY_DEFAULT);
             Canvas canvas = new Canvas(baseBitmap);
-            Rect rect = new Rect(0, 0, width, height);
+
+            // 描画元の矩形
+            Rect srcRect = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
+            // 描画先の矩形
+            Rect destRect = new Rect(0, 0, width, height);
             Paint paint = new Paint();
             paint.setStyle(Paint.Style.FILL);
-            canvas.drawBitmap(bitmap, rect, rect, paint);
+            // TODO: これで元画像縮小される?
+            canvas.drawBitmap(bitmap, srcRect, destRect, paint);
 
             // TODO: update message.
             setResultText(R.string.describe);
