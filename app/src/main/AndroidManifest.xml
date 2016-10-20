@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="jp.co.eforce.smarteyeglass.recognizeimage">
+
+    <!-- Framework and all other SmartEyeglass APIs: -->
+    <uses-permission android:name="com.sonyericsson.extras.liveware.aef.EXTENSION_PERMISSION" />
+    <uses-permission android:name="com.sony.smarteyeglass.permission.SMARTEYEGLASS" />
+    <!-- SmartEyeglass Camera  API: -->
+    <uses-permission android:name="com.sony.smarteyeglass.permission.CAMERA" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    -->
+
+    <application
+        android:icon="@drawable/icon"
+        android:label="@string/app_name">
+
+        <activity
+            android:name=".RecognizeImagePreferenceActivity"
+            android:label="@string/preference_activity_title" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+            </intent-filter>
+        </activity>
+
+        <service android:name=".RecognizeImageExtensionService" />
+
+        <!--
+        <service android:name="com.sonyericsson.extras.liveware.extension.util.TunnelService" >
+            <intent-filter>
+                <action android:name="com.sonyericsson.extras.liveware.aef.tunnel.action.BIND" />
+            </intent-filter>
+        </service>
+        -->
+
+        <receiver
+            android:name=".RecognizeImageExtensionReceiver">
+            <intent-filter>
+                <!-- Generic extension intents. -->
+                <action android:name="com.sonyericsson.extras.liveware.aef.registration.EXTENSION_REGISTER_REQUEST" />
+                <action android:name="com.sonyericsson.extras.liveware.aef.registration.ACCESSORY_CONNECTION" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+
+                <!-- Notification intents -->
+                <action android:name="com.sonyericsson.extras.liveware.aef.notification.VIEW_EVENT_DETAIL" />
+                <action android:name="com.sonyericsson.extras.liveware.aef.notification.REFRESH_REQUEST" />
+
+                <!-- Widget intents -->
+                <action android:name="com.sonyericsson.extras.aef.widget.START_REFRESH_IMAGE_REQUEST" />
+                <action android:name="com.sonyericsson.extras.aef.widget.STOP_REFRESH_IMAGE_REQUEST" />
+                <action android:name="com.sonyericsson.extras.aef.widget.ONTOUCH" />
+                <action android:name="com.sonyericsson.extras.liveware.extension.util.widget.scheduled.refresh" />
+
+                <!-- Control intents -->
+                <action android:name="com.sonyericsson.extras.aef.control.START" />
+                <action android:name="com.sonyericsson.extras.aef.control.STOP" />
+                <action android:name="com.sonyericsson.extras.aef.control.PAUSE" />
+                <action android:name="com.sonyericsson.extras.aef.control.RESUME" />
+                <action android:name="com.sonyericsson.extras.aef.control.ERROR" />
+                <action android:name="com.sonyericsson.extras.aef.control.KEY_EVENT" />
+                <action android:name="com.sonyericsson.extras.aef.control.TOUCH_EVENT" />
+                <action android:name="com.sonyericsson.extras.aef.control.TAP_EVENT" />
+                <action android:name="com.sonyericsson.extras.aef.control.SWIPE_EVENT" />
+                <action android:name="com.sonyericsson.extras.aef.control.CAMERA_CAPTURE_RESPONSE" />
+                <action android:name="com.sonyericsson.extras.aef.control.RENDER_OBJECT_REGISTER_ACK" />
+                <action android:name="com.sonyericsson.extras.aef.control.RENDER_OBJECT_REQUEST" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>

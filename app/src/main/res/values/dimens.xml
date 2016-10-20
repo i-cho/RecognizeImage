@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Default screen margins, per the Android Design guidelines. -->
+    <dimen name="text_result_width">230px</dimen>
+    <dimen name="preview_image_width">184px</dimen>
+    <dimen name="preview_image_height">138px</dimen>
+</resources>
