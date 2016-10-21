@@ -39,9 +39,6 @@ import java.io.FileOutputStream;
 
 /**
  * Save photo data.
- * @param Params
- * @param Progress
- * @param Result
  */
 class SavePhotoTask extends AsyncTask<byte[], String, String> {
     private final String fileName;

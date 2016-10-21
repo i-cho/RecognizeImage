@@ -7,14 +7,13 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Environment;
 import android.text.format.Time;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.widget.EditText;
 
-import com.microsoft.projectoxford.vision.VisionServiceClient;
-import com.microsoft.projectoxford.vision.VisionServiceRestClient;
 import com.sony.smarteyeglass.SmartEyeglassControl;
 import com.sony.smarteyeglass.extension.util.CameraEvent;
 import com.sony.smarteyeglass.extension.util.ControlCameraException;
@@ -24,9 +23,18 @@ import com.sonyericsson.extras.liveware.aef.control.Control;
 import com.sonyericsson.extras.liveware.extension.util.control.ControlExtension;
 import com.sonyericsson.extras.liveware.extension.util.control.ControlTouchEvent;
 
-import java.io.File;
+import com.google.gson.Gson;
+import com.microsoft.projectoxford.vision.VisionServiceClient;
+import com.microsoft.projectoxford.vision.VisionServiceRestClient;
+import com.microsoft.projectoxford.vision.contract.AnalysisResult;
+import com.microsoft.projectoxford.vision.contract.Category;
+import com.microsoft.projectoxford.vision.contract.Face;
+import com.microsoft.projectoxford.vision.contract.Tag;
+import com.microsoft.projectoxford.vision.contract.Caption;
+import com.microsoft.projectoxford.vision.rest.VisionServiceException;
 
-import static com.sony.smarteyeglass.SmartEyeglassControl.Intents.POWER_MODE_HIGH;
+import java.io.ByteArrayInputStream;
+import java.io.File;
 
 /**
  * Created by cho on 2016/10/14.
@@ -34,18 +42,27 @@ import static com.sony.smarteyeglass.SmartEyeglassControl.Intents.POWER_MODE_HIG
 
 public final class RecognizeImageControl extends ControlExtension {
 
-    /** Uses SmartEyeglass API version*/
+    /**
+     * Uses SmartEyeglass API version
+     */
     private static final int SMARTEYEGLASS_API_VERSION = 3;
+
+    /**
+     * The application context.
+     */
+    private final Context context;
+
+    /**
+     * Capture image from camera
+     */
+    private Bitmap mBitmap = null;
     private final int width;
     private final int height;
     private final int drawX;
     private final int drawY;
 
-    /** The application context. */
-    private final Context context;
-
     /**
-     *  Instance of the Control Utility class.
+     * Instance of the Control Utility class.
      */
     private final SmartEyeglassControlUtils utils;
     private boolean cameraStarted = false;
@@ -53,10 +70,7 @@ public final class RecognizeImageControl extends ControlExtension {
     private int resolution = SmartEyeglassControl.Intents.CAMERA_RESOLUTION_VGA;
     private int recordingMode = SmartEyeglassControl.Intents.CAMERA_MODE_STILL;
 
-    // The image selected to detect.
-    private Bitmap mBitmap;
-
-    private VisionServiceClient client;
+    private VisionServiceClient visionClient;
 
     /**
      * for debugging
@@ -70,18 +84,16 @@ public final class RecognizeImageControl extends ControlExtension {
     /**
      * Creates an instance of this control class.
      *
-     * @param context
-     *            The application context.
-     * @param hostAppPackageName
-     *            Package name of host application.
+     * @param context            The application context.
+     * @param hostAppPackageName Package name of host application.
      */
     public RecognizeImageControl(final Context context,
-                                  final String hostAppPackageName) {
+                                 final String hostAppPackageName) {
         super(context, hostAppPackageName);
         this.context = context;
 
-        if (client == null){
-            client = new VisionServiceRestClient(context.getString(R.string.subscription_key));
+        if (visionClient == null) {
+            visionClient = new VisionServiceRestClient(context.getString(R.string.subscription_key));
         }
 
         // Initialize listener for camera events
@@ -91,9 +103,40 @@ public final class RecognizeImageControl extends ControlExtension {
             @Override
             public void onCameraReceived(final CameraEvent event) {
                 Log.d(Constants.LOG_TAG, "Stream Event coming: " + event.toString());
-                cameraEventOperation(event);
 
-                // TODO: next describing...
+                if (event.getErrorStatus() != 0) {
+                    Log.d(Constants.LOG_TAG, "error code = " + event.getErrorStatus());
+                    return;
+                }
+
+                if (event.getIndex() != 0) {
+                    Log.d(Constants.LOG_TAG, "not oparate this event");
+                    return;
+                }
+
+                if (recordingMode != SmartEyeglassControl.Intents.CAMERA_MODE_STILL) {
+                    Log.d(Constants.LOG_TAG, "not CAMERA_MODE_STILL mode.");
+                    return;
+                }
+
+                if ((event.getData() != null) && ((event.getData().length) > 0)) {
+                    byte[] jpgData = event.getData();
+
+                    // Get preview image
+                    mBitmap = getPreviewImage(jpgData);
+                    if (mBitmap != null) {
+                        // Show preview
+                        setResultText(R.string.describe);
+                        utils.showBitmap(mBitmap, drawX, drawY);
+
+                        // describing...
+                        try {
+                            new DescribeTask().execute(jpgData);
+                        } catch (Exception e) {
+                            Log.d(Constants.LOG_TAG, e.toString());
+                        }
+                    }
+                }
             }
 
             // Called when camera operation has failed
@@ -151,6 +194,8 @@ public final class RecognizeImageControl extends ControlExtension {
         utils.setCameraMode(jpegQuality, resolution, recordingMode);
 
         cameraStarted = false;
+
+        mBitmap = null;
 
         updateLayout();
         setResultText(R.string.usage);
@@ -219,32 +264,16 @@ public final class RecognizeImageControl extends ControlExtension {
     /**
      * Received camera event and operation each event.
      *
-     * @param event
+     * @param data
      */
-    private void cameraEventOperation(CameraEvent event) {
-        if (event.getErrorStatus() != 0) {
-            Log.d(Constants.LOG_TAG, "error code = " + event.getErrorStatus());
-            return;
-        }
+    private Bitmap getPreviewImage(byte[] data) {
 
-        if(event.getIndex() != 0){
-            Log.d(Constants.LOG_TAG, "not oparate this event");
-            return;
-        }
-
-        Bitmap bitmap = null;
-        byte[] data = null;
-
-        if ((event.getData() != null) && ((event.getData().length) > 0)) {
-            // JPEG/YUV422
-            data = event.getData();
-            // jpeg to bitmap.
-            bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
-        }
+        Bitmap bitmap;
+        bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
 
         if (bitmap == null) {
             Log.d(Constants.LOG_TAG, "bitmap == null");
-            return;
+            return null;
         }
 
         if (saveToSdcard == true) {
@@ -253,41 +282,31 @@ public final class RecognizeImageControl extends ControlExtension {
             saveFileIndex++;
         }
 
-        if (recordingMode == SmartEyeglassControl.Intents.CAMERA_MODE_STILL) {
-            Bitmap baseBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-            //bitmap[3] = Bitmap.createScaledBitmap(bitmap[0], 80, 48, true);
-            baseBitmap.setDensity(DisplayMetrics.DENSITY_DEFAULT);
-            Canvas canvas = new Canvas(baseBitmap);
+        Bitmap baseBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        //bitmap[3] = Bitmap.createScaledBitmap(bitmap[0], 80, 48, true);
+        baseBitmap.setDensity(DisplayMetrics.DENSITY_DEFAULT);
+        Canvas canvas = new Canvas(baseBitmap);
 
-            // 描画元の矩形
-            Rect srcRect = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
-            // 描画先の矩形
-            Rect destRect = new Rect(0, 0, width, height);
-            Paint paint = new Paint();
-            paint.setStyle(Paint.Style.FILL);
-            // TODO: これで元画像縮小される?
-            canvas.drawBitmap(bitmap, srcRect, destRect, paint);
+        // 描画元の矩形
+        Rect srcRect = new Rect(0, 0, bitmap.getWidth(), bitmap.getHeight());
+        // 描画先の矩形
+        Rect destRect = new Rect(0, 0, width, height);
+        Paint paint = new Paint();
+        paint.setStyle(Paint.Style.FILL);
+        canvas.drawBitmap(bitmap, srcRect, destRect, paint);
 
-            // TODO: update message.
-            setResultText(R.string.describe);
-
-            //utils.showBitmap(baseBitmap);
-            utils.showBitmap(baseBitmap, drawX, drawY);
-
-            return;
-        }
-
+        return baseBitmap;
     }
 
     /**
-     *  Update the display with the dynamic message text.
+     * Update the display with the dynamic message text.
      */
     private void updateLayout() {
         showLayout(R.layout.layout_control, null);
     }
 
     /**
-     *  Update the display with the dynamic message text.
+     * Update the display with the dynamic message text.
      */
     private void setResultText(int idRes) {
         String text = context.getString(idRes);
@@ -297,4 +316,59 @@ public final class RecognizeImageControl extends ControlExtension {
     private void setResultText(String text) {
         sendText(R.id.textResult, text);
     }
+
+    /**
+     *
+     */
+    private class DescribeTask extends AsyncTask<byte[], String, String> {
+        // Store error message
+        private Exception e = null;
+
+        public DescribeTask() {
+        }
+
+        @Override
+        protected String doInBackground(byte[]... jpeg) {
+            try {
+                Gson gson = new Gson();
+
+                // Put the image into an input stream for detection.
+                ByteArrayInputStream inputStream = new ByteArrayInputStream(jpeg[0]);
+
+                AnalysisResult v = visionClient.describe(inputStream, 1);
+
+                String result = gson.toJson(v);
+                Log.d(Constants.LOG_TAG, "AnalysisResult: " + result);
+
+                return result;
+            } catch (Exception e) {
+                this.e = e;    // Store error
+            }
+
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(String data) {
+            super.onPostExecute(data);
+            // Display based on error existence
+            String textResult = "";
+            setResultText("");
+            if (e != null) {
+                setResultText("Error: " + e.getMessage());
+                this.e = null;
+            } else {
+                Gson gson = new Gson();
+                AnalysisResult result = gson.fromJson(data, AnalysisResult.class);
+
+                for (Caption caption : result.description.captions) {
+                    textResult += caption.text;
+                }
+                setResultText(textResult);
+                utils.showBitmap(mBitmap, drawX, drawY);
+            }
+            //mButtonSelectImage.setEnabled(true);
+        }
+    }
+
 }
