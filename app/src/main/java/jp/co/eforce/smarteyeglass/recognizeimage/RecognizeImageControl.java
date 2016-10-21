@@ -283,7 +283,6 @@ public final class RecognizeImageControl extends ControlExtension {
         }
 
         Bitmap baseBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        //bitmap[3] = Bitmap.createScaledBitmap(bitmap[0], 80, 48, true);
         baseBitmap.setDensity(DisplayMetrics.DENSITY_DEFAULT);
         Canvas canvas = new Canvas(baseBitmap);
 
