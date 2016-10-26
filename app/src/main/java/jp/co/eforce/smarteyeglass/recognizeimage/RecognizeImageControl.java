@@ -340,7 +340,9 @@ public final class RecognizeImageControl extends ControlExtension {
             Translate.setClientSecret(context.getString(R.string.azure_app_client_secret));
 
             try {
-                String translatedText = String.valueOf(Translate.execute(words, Language.ENGLISH, Language.JAPANESE));
+                //String translatedText = String.valueOf(Translate.execute(words, Language.ENGLISH, Language.JAPANESE));
+                String translatedText = Translate.execute(words[0], Language.ENGLISH, Language.JAPANESE);
+                Log.d(Constants.LOG_TAG, "Translate: " + translatedText);
                 return translatedText;
             } catch (Exception e) {
                 this.e = e;    // Store error
@@ -417,7 +419,7 @@ public final class RecognizeImageControl extends ControlExtension {
                 }
                 // show face
                 for (Face face: result.faces) {
-                    textResult += "\n";
+                    textResult += "\r\n";
                     textResult += "gender:" + face.gender;
                     textResult += ", age:" + face.age;
                 }
