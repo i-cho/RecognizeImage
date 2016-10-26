@@ -32,4 +32,5 @@ dependencies {
     compile project(':SmartExtensionUtils')
     compile 'com.microsoft.projectoxford:vision:1.0.354'
     compile files('libs/gson-2.3.1.jar')
+    compile files('libs/microsoft-translator-java-api-0.6.2-jar-with-dependencies.jar')
 }

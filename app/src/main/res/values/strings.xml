@@ -7,6 +7,11 @@
     <string name="add_subscription_key_tip_title">Subscription Key is Needed</string>
     <string name="add_subscription_key_tip">Please put your subscription key to source file \"app/res/values/strings.xml\" to enable Vision API calls.</string>
 
+
+    <!-- Please refer to https://datamarket.azure.com/developer/applications to get your client ID, client secret -->
+    <string name="azure_app_client_id">RecognizeImage_translate</string>
+    <string name="azure_app_client_secret">mBouSbHdOCDz/ppxsZ8kh5vfZiE//ex2Ow4VMM/6zpU=</string>
+
     <!-- Title of preference activity -->
     <string name="preference_activity_title">Recognize Image Settings</string>
     <!-- Name of extension, shown in preferences -->

@@ -1,19 +1,21 @@
 package jp.co.eforce.smarteyeglass.recognizeimage;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Environment;
+import android.preference.PreferenceManager;
 import android.text.format.Time;
 import android.util.DisplayMetrics;
 import android.util.Log;
-import android.widget.EditText;
 
+import com.memetix.mst.language.Language;
+import com.memetix.mst.translate.Translate;
 import com.sony.smarteyeglass.SmartEyeglassControl;
 import com.sony.smarteyeglass.extension.util.CameraEvent;
 import com.sony.smarteyeglass.extension.util.ControlCameraException;
@@ -27,11 +29,8 @@ import com.google.gson.Gson;
 import com.microsoft.projectoxford.vision.VisionServiceClient;
 import com.microsoft.projectoxford.vision.VisionServiceRestClient;
 import com.microsoft.projectoxford.vision.contract.AnalysisResult;
-import com.microsoft.projectoxford.vision.contract.Category;
 import com.microsoft.projectoxford.vision.contract.Face;
-import com.microsoft.projectoxford.vision.contract.Tag;
 import com.microsoft.projectoxford.vision.contract.Caption;
-import com.microsoft.projectoxford.vision.rest.VisionServiceException;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -75,7 +74,8 @@ public final class RecognizeImageControl extends ControlExtension {
     /**
      * for debugging
      */
-    private boolean saveToSdcard = true;
+    private boolean saveToSdcard = false;
+    private boolean translate = true;
     private int saveFileIndex;
     private String saveFilePrefix;
     private File saveFolder;
@@ -131,7 +131,7 @@ public final class RecognizeImageControl extends ControlExtension {
 
                         // describing...
                         try {
-                            new DescribeTask().execute(jpgData);
+                            new AnalyzeTask().execute(jpgData);
                         } catch (Exception e) {
                             Log.d(Constants.LOG_TAG, e.toString());
                         }
@@ -189,6 +189,11 @@ public final class RecognizeImageControl extends ControlExtension {
         now.setToNow();
         saveFilePrefix = "smarteyeglass_" + now.format2445() + "_";
         saveFileIndex = 0;
+
+        // Read the settings for the extension.
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        saveToSdcard = prefs.getBoolean(context.getString(R.string.preference_key_save_to_sdcard), false);
+        translate = prefs.getBoolean(context.getString(R.string.preference_key_translate), true);
 
         // Set the camera mode to match the setup
         utils.setCameraMode(jpegQuality, resolution, recordingMode);
@@ -317,24 +322,70 @@ public final class RecognizeImageControl extends ControlExtension {
     }
 
     /**
-     *
+     * doInBackground ... arg
+     * onProgressUpdate ... arg
+     * onPostExecute ... return
      */
-    private class DescribeTask extends AsyncTask<byte[], String, String> {
+    private class TranslateTask extends AsyncTask<String, Integer, String> {
         // Store error message
         private Exception e = null;
 
-        public DescribeTask() {
+        public TranslateTask() {
+        }
+
+        @Override
+        protected String doInBackground(String... words) {
+
+            Translate.setClientId(context.getString(R.string.azure_app_client_id));
+            Translate.setClientSecret(context.getString(R.string.azure_app_client_secret));
+
+            try {
+                String translatedText = String.valueOf(Translate.execute(words, Language.ENGLISH, Language.JAPANESE));
+                return translatedText;
+            } catch (Exception e) {
+                this.e = e;    // Store error
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(String translatedText) {
+            super.onPostExecute(translatedText);
+            // Display based on error existence
+            setResultText("");
+            if (e != null) {
+                setResultText("Error: " + e.getMessage());
+                this.e = null;
+            } else {
+                setResultText(translatedText);
+                utils.showBitmap(mBitmap, drawX, drawY);
+            }
+        }
+
+    }
+
+    /**
+     *
+     */
+    private class AnalyzeTask extends AsyncTask<byte[], String, String> {
+        // Store error message
+        private Exception e = null;
+
+        public AnalyzeTask() {
         }
 
         @Override
         protected String doInBackground(byte[]... jpeg) {
             try {
                 Gson gson = new Gson();
+                String[] features = {"Description", "ImageType", "Color", "Faces", "Adult", "Categories"};
+                String[] details = {};
 
                 // Put the image into an input stream for detection.
                 ByteArrayInputStream inputStream = new ByteArrayInputStream(jpeg[0]);
 
-                AnalysisResult v = visionClient.describe(inputStream, 1);
+                //AnalysisResult v = visionClient.describe(inputStream, 1);
+                AnalysisResult v = visionClient.analyzeImage(inputStream, features, details);
 
                 String result = gson.toJson(v);
                 Log.d(Constants.LOG_TAG, "AnalysisResult: " + result);
@@ -360,11 +411,24 @@ public final class RecognizeImageControl extends ControlExtension {
                 Gson gson = new Gson();
                 AnalysisResult result = gson.fromJson(data, AnalysisResult.class);
 
+                // show description
                 for (Caption caption : result.description.captions) {
                     textResult += caption.text;
                 }
-                setResultText(textResult);
-                utils.showBitmap(mBitmap, drawX, drawY);
+                // show face
+                for (Face face: result.faces) {
+                    textResult += "\n";
+                    textResult += "gender:" + face.gender;
+                    textResult += ", age:" + face.age;
+                }
+
+                if (translate) {
+                    new TranslateTask().execute(textResult);
+                } else {
+                    setResultText(textResult);
+                    utils.showBitmap(mBitmap, drawX, drawY);
+                }
+
             }
             //mButtonSelectImage.setEnabled(true);
         }

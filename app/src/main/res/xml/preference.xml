@@ -5,5 +5,15 @@
     <Preference
         android:key="@string/preference_key_read_me"
         android:title="@string/preference_option_read_me" />
+    <CheckBoxPreference
+        android:defaultValue="false"
+        android:title="Save photos"
+        android:key="preference_key_save_to_sdcard"
+        android:summary="Check to save photos taken to the sdcard" />
+    <CheckBoxPreference
+        android:defaultValue="true"
+        android:title="Translate"
+        android:key="preference_key_translate"
+        android:summary="Check to translate descriptions into Japanese." />
 
 </PreferenceScreen>

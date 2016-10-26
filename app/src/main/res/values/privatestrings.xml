@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="preference_key_read_me">preference_key_read_me</string>
-
+    <string name="preference_key_save_to_sdcard">preference_key_save_to_sdcard</string>
+    <string name="preference_key_translate">preference_key_translate</string>
 </resources>
