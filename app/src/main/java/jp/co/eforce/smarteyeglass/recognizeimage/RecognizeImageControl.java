@@ -405,7 +405,7 @@ public final class RecognizeImageControl extends ControlExtension {
             super.onPostExecute(data);
             // Display based on error existence
             String textResult = "";
-            setResultText("");
+            //setResultText("");
             if (e != null) {
                 setResultText("Error: " + e.getMessage());
                 this.e = null;
